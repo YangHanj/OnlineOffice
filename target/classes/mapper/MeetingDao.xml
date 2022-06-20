@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="iee.yh.onlineoffice.db.dao.MeetingDao">
+
+	<!-- 可根据自己的需求，是否要使用 -->
+    <resultMap type="iee.yh.onlineoffice.db.entity.MeetingEntity" id="meetingMap">
+        <result property="id" column="id"/>
+        <result property="uuid" column="uuid"/>
+        <result property="title" column="title"/>
+        <result property="creatorId" column="creator_id"/>
+        <result property="date" column="date"/>
+        <result property="place" column="place"/>
+        <result property="start" column="start"/>
+        <result property="end" column="end"/>
+        <result property="type" column="type"/>
+        <result property="members" column="members"/>
+        <result property="desc" column="desc"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+<!--   分页查询会议记录 -->
+    <select id="searchMyMeetingListPage" parameterType="HashMap" resultType="HashMap">
+        SELECT
+            m.id,m.uuid,m.title,u2.name,
+            DATE_FORMAT(m.date,'%Y年%m月%d日') AS date,
+            m.place,
+            DATE_FORMAT(m.start,'%H:%i') AS start,
+            DATE_FORMAT(m.end,'%H:%i') AS end,
+            m.type,m.status,m.desc_meet AS `desc`,u2.photo,
+            TIMESTAMPDIFF(HOUR,CONCAT(m.date," ",m.start),CONCAT(m.date," ",m.end)) AS hour
+        FROM tb_meeting m
+        JOIN tb_user u1 ON JSON_CONTAINS(m.members,CAST(u1.id AS CHAR))
+        JOIN tb_user u2 ON m.creator_id = u2.id
+        WHERE u1.id =#{userId} AND u1.status = 1 AND u2.status = 1 AND m.status IN(3,4)
+				ORDER BY m.date,m.status,m.id
+				LIMIT #{start},#{length}
+    </select>
+
+    <select id="searchMeetingMembersInSameDept" parameterType="String" resultType="boolean">
+        SELECT
+            IF(COUNT(DISTINCT u.dept_id) = 1,TRUE,FALSE) AS bool
+        FROM tb_meeting m
+        JOIN tb_user u ON JSON_CONTAINS(m.members,CAST(u.id AS CHAR))
+        WHERE m.uuid=#{uuid} AND u.status = 1
+    </select>
+
+    <update id="updateMeetingInstanceId" parameterType="HashMap">
+        UPDATE tb_meeting
+        SET instance_id=#{instanceId}
+        WHERE uuid=#{uuid}
+    </update>
+<!--查询会议详情-->
+    <select id="searchMeetingById" parameterType="int" resultType="HashMap">
+        SELECT
+            m.uuid,
+            m.creator_id AS creatorId,
+            m.title,
+            u.name,
+            DATE_FORMAT(m.date,"%Y-%m-%d") AS date,
+            m.place,
+            DATE_FORMAT(m.start,"%H:%i") AS start,
+            DATE_FORMAT(m.end,"%H:%i") AS end,
+            m.type,
+            m.status,
+            m.desc_meet,
+            m.instance_id AS instanceId
+        FROM tb_meeting m
+        JOIN tb_user u ON m.creator_id = u.id
+        WHERE m.id=#{id} AND u.status = 1
+    </select>
+<!--    查询参会人-->
+    <select id="searchMeetingMembers" parameterType="int" resultType="HashMap">
+        SELECT
+            u.id,
+            u.name,
+            u.photo
+        FROM tb_meeting m
+        JOIN tb_user u ON JSON_CONTAINS (m.members,CAST(u.id AS CHAR))
+        WHERE m.id=#{id} AND u.status = 1
+    </select>
+
+    <update id="updateMeetingInfo" parameterType="HashMap">
+        UPDATE
+            tb_meeting
+        SET title = #{title},
+        date = #{date},
+        <if test="place!=null"> place = #{place},</if>
+        <if test="place == null">place=NULL,</if>
+        start = #{start},
+        end = #{end},
+        type = #{type},
+        members=#{members},
+        desc_meet = #{desc},
+        status = #{status}
+        WHERE id=#{id} AND status = 3
+    </update>
+
+    <select id="searchUserTaskListByPage" parameterType="HashMap" resultType="HashMap">
+        SELECT
+            m.id,m.uuid,m.title,m.creator_id AS creatorId,m.instance_id AS taskId,
+            DATE_FORMAT(m.date,'%Y年%m月%d日') AS date,
+            m.place,
+            DATE_FORMAT(m.start,'%H:%i') AS start,
+            DATE_FORMAT(m.end,'%H:%i') AS end,
+            m.type,m.status,m.desc_meet AS `desc`,
+            TIMESTAMPDIFF(HOUR,CONCAT(m.date," ",m.start),CONCAT(m.date," ",m.end)) AS hour,m.members,
+            u.name,u.photo
+        FROM tb_meeting m
+        JOIN tb_user u ON m.creator_id = u.id
+        WHERE m.status =#{type}
+        ORDER BY m.date,m.status,m.id
+        LIMIT #{start},#{length}
+    </select>
+</mapper>
